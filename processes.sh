@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Get listening TCP ports with process and user information
+# Get listening TCP ports with process and user information, separated by '|'
 netstat -anp | grep -i listen | awk '/^tcp/ || /^tcp6/ {
     # Extract IP:Port
     split($4, ip_port, ":");
@@ -20,6 +20,6 @@ netstat -anp | grep -i listen | awk '/^tcp/ || /^tcp6/ {
         userContext = "-";
     }
 
-    # Print the formatted output
-    print userContext, ipPort, processName;
+    # Print the formatted output with '|' as delimiter
+    print userContext "|" ipPort "|" processName;
 }'
