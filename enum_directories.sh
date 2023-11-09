@@ -2,6 +2,13 @@
 
 # Script to enumerate specified directories and their subdirectories
 # Output format: Directory Name | Permissions | Owner | Group
+# Results are outputted to a file in /tmp with naming convention (hostname)_blah_assessment_output.csv
+
+# Retrieve the hostname
+hostname=$(hostname)
+
+# Define the output file with naming convention
+output_file="/tmp/${hostname}_blah_assessment_output.csv"
 
 # List of parent directories to target
 directories=(/etc /home /opt /root /var)
@@ -16,5 +23,7 @@ enumerate_directories() {
     done
 }
 
-# Call the function with the specified directories
-enumerate_directories "${directories[@]}"
+# Call the function and redirect output to the file
+enumerate_directories "${directories[@]}" > "$output_file"
+
+echo "Enumeration complete. Results saved to $output_file"
