@@ -12,8 +12,14 @@ netstat -anp | grep -i listen | awk '/^tcp/ || /^tcp6/ {
     processName = (pid == "-" ? "-" : pid_proc[2]);
 
     # Get user context for the process if process ID is available
-    userContext = (pid == "-" ? "-" : system("ps -o user= -p " pid));
+    if (pid != "-") {
+        cmd = "ps -o user= -p " pid;
+        cmd | getline userContext;
+        close(cmd);
+    } else {
+        userContext = "-";
+    }
 
     # Print the formatted output
-    print ipPort, processName, userContext;
+    print userContext, ipPort, processName;
 }'
