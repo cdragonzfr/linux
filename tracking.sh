@@ -6,12 +6,13 @@ masterListPath="/path/to/masterlist.csv"
 # Define the path for the output CSV file
 outputCsvPath="/tmp/output.csv"
 
-# Get the current system's hostname
-currentHostname=$(hostname)
+# Get the current system's hostname and convert it to uppercase
+currentHostname=$(hostname | tr '[:lower:]' '[:upper:]')
 
 # Read the master list file and filter the records
 # Assuming the CSV file has headers with 'Hostname' and 'DirectoryPath'
-filteredRecords=$(awk -F, -v host="$currentHostname" '$1 == host {print $0}' "$masterListPath")
+# Converting the hostname from the file to uppercase for case-insensitive comparison
+filteredRecords=$(awk -F, -v host="$currentHostname" 'toupper($1) == host {print $0}' "$masterListPath")
 
 # Initialize the output CSV file and write the headers
 echo "Hostname,FilePath,Presence" > "$outputCsvPath"
