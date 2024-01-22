@@ -6,6 +6,10 @@ masterListPath="/path/to/masterlist.csv"
 # Define the path for the output CSV file
 outputCsvPath="/tmp/output.csv"
 
+if [ -f "$outputCsvPath" ]; then
+    rm "$outputCsvPath"
+fi
+
 # Get the current system's hostname and convert it to uppercase
 currentHostname=$(hostname | tr '[:lower:]' '[:upper:]')
 
