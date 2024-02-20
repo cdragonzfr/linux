@@ -13,8 +13,12 @@ TOTAL_SIZE=0
 
 # List all files in the S3 bucket and prefix, then filter by date range
 aws s3 ls s3://$BUCKET_NAME/$PREFIX --recursive | while read -r line; do
-  # Extract the start date from the filename
-  FILE_START_DATE=$(echo $line | awk '{print $4}' | cut -d '-' -f1,2,3)
+  # Extract the filename from the line
+  FILENAME=$(echo $line | awk '{print $4}')
+  
+  # Assuming the prefix ends before the first date, we use a pattern to extract the date
+  # This pattern finds the portion of the filename starting from the first occurrence of a date-like pattern
+  FILE_START_DATE=$(echo $FILENAME | grep -oP '\d{4}-\d{2}-\d{2}' | head -n 1)
 
   # Convert dates to comparable formats
   FILE_DATE=$(date -d "$FILE_START_DATE" +%s)
