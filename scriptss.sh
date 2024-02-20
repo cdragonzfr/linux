@@ -11,8 +11,8 @@ END_DATE="2023-01-31"
 # Initialize total size variable
 TOTAL_SIZE=0
 
-# List all files in the S3 bucket and prefix, then filter by date range
-aws s3 ls s3://$BUCKET_NAME/$PREFIX --recursive | while read -r line; do
+# Use process substitution to avoid creating a subshell
+while read -r line; do
   # Extract the filename from the line
   FILENAME=$(echo $line | awk '{print $4}')
   
@@ -31,6 +31,6 @@ aws s3 ls s3://$BUCKET_NAME/$PREFIX --recursive | while read -r line; do
     FILE_SIZE=$(echo $line | awk '{print $3}')
     TOTAL_SIZE=$((TOTAL_SIZE + FILE_SIZE))
   fi
-done
+done < <(aws s3 ls s3://$BUCKET_NAME/$PREFIX --recursive)
 
 echo "Total size of files in the date range: $TOTAL_SIZE bytes"
