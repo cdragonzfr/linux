@@ -7,7 +7,7 @@ def manipulate_csv(input_csv, output_csv):
 
     # Create a new DataFrame with the desired columns
     new_df = pd.DataFrame()
-    new_df['A'] = 'DB50'  # Column A with a constant value 'DB50'
+    new_df['A'] = ['DB50'] * len(df)  # Column A with a constant value 'DB50'
     new_df['B'] = df['Code']  # Column B with the 'Code' from the input CSV
     new_df['C'] = df['Action Name']  # Column C with the 'Action Name' from the input CSV
 
