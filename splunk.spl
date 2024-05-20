@@ -1,0 +1,11 @@
+| rest /services/authentication/users 
+| search title="<username>" 
+| table roles
+
+
+
+| rest /services/authorization/roles
+| search title IN (<role1>, <role2>, <role3>)  # Replace with actual role names
+| table title srchTimeWin srchFilter srchIndexesAllowed srchIndexesDefault
+
+
