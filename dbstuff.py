@@ -15,15 +15,15 @@ def manipulate_csv(input_csv, output_csv):
     new_df['D'] = 'Action_Name = "' + df['Action Name'] + '"'
 
     # Create the combined row
-    combined_row = {
-        'A': 'DB50',
-        'B': 'ALL',
-        'C': 'ALL',
-        'D': ' OR '.join([f'ACTION_NAME="{action_name}"' for action_name in df['Action Name']])
-    }
+    combined_row = pd.DataFrame({
+        'A': ['DB50'],
+        'B': ['ALL'],
+        'C': ['ALL'],
+        'D': [' OR '.join([f'ACTION_NAME="{action_name}"' for action_name in df['Action Name']])]
+    })
 
-    # Append the combined row to the DataFrame
-    new_df = new_df.append(combined_row, ignore_index=True)
+    # Concatenate the combined row to the DataFrame
+    new_df = pd.concat([new_df, combined_row], ignore_index=True)
 
     # Save the new DataFrame to the output CSV file
     new_df.to_csv(output_csv, index=False)
