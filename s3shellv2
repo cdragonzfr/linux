@@ -24,16 +24,23 @@ while : ; do
     fi
   fi
 
-  # Check for pagination token
-  NEXT_TOKEN=$(aws s3api list-objects-v2 --bucket "$BUCKET_NAME" --prefix "$PREFIX" --query "NextContinuationToken" --output text)
-
   # Append response to the output file
   echo "$RESPONSE" >> $OUTPUT_FILE
+
+  # Check for pagination token
+  if [[ -z "$PREFIX" ]]; then
+    NEXT_TOKEN=$(aws s3api list-objects-v2 --bucket "$BUCKET_NAME" --query "NextContinuationToken" --output text)
+  else
+    NEXT_TOKEN=$(aws s3api list-objects-v2 --bucket "$BUCKET_NAME" --prefix "$PREFIX" --query "NextContinuationToken" --output text)
+  fi
 
   # Break the loop if there is no next token
   if [[ "$NEXT_TOKEN" == "None" ]]; then
     break
   fi
 done
+
+# Ensure the output file has one filename per line
+tr ' ' '\n' < $OUTPUT_FILE > temp_file && mv temp_file $OUTPUT_FILE
 
 echo "List of Glacier files has been saved to $OUTPUT_FILE"
