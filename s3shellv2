@@ -1,0 +1,60 @@
+#!/bin/bash
+
+BUCKET_NAME="your-bucket-name"
+PREFIX="your-prefix/"  # Specify the prefix (folder) you want to query
+START_DATE="2023-01-01T00:00:00Z"
+END_DATE="2023-12-31T23:59:59Z"
+OUTPUT_FILE="glacier-files.txt"
+
+# Initialize the output file
+> $OUTPUT_FILE
+
+# Function to convert date to epoch for comparison
+date_to_epoch() {
+  date -d "$1" +"%s"
+}
+
+# Convert START_DATE and END_DATE to epoch
+START_EPOCH=$(date_to_epoch "$START_DATE")
+END_EPOCH=$(date_to_epoch "$END_DATE")
+
+# Paginate through the list of objects
+NEXT_TOKEN=""
+while : ; do
+  if [[ -z "$NEXT_TOKEN" ]]; then
+    RESPONSE=$(aws s3api list-objects-v2 --bucket "$BUCKET_NAME" --prefix "$PREFIX" --output json)
+  else
+    RESPONSE=$(aws s3api list-objects-v2 --bucket "$BUCKET_NAME" --prefix "$PREFIX" --output json --starting-token "$NEXT_TOKEN")
+  fi
+
+  # Extract Keys, LastModified, and StorageClass
+  KEYS=$(echo "$RESPONSE" | grep -oP '"Key": "\K[^"]+')
+  LAST_MODIFIED=$(echo "$RESPONSE" | grep -oP '"LastModified": "\K[^"]+')
+  STORAGE_CLASS=$(echo "$RESPONSE" | grep -oP '"StorageClass": "\K[^"]+')
+
+  # Iterate through each object and filter by date and storage class
+  IFS=$'\n'
+  for i in $(seq 0 $(($(echo "$KEYS" | wc -l) - 1))); do
+    KEY=$(echo "$KEYS" | sed -n "$((i + 1))p")
+    MODIFIED=$(echo "$LAST_MODIFIED" | sed -n "$((i + 1))p")
+    CLASS=$(echo "$STORAGE_CLASS" | sed -n "$((i + 1))p")
+
+    # Convert LastModified to epoch
+    MODIFIED_EPOCH=$(date_to_epoch "$MODIFIED")
+
+    # Check if object is within date range and in Glacier storage class
+    if [[ "$MODIFIED_EPOCH" -ge "$START_EPOCH" && "$MODIFIED_EPOCH" -le "$END_EPOCH" && "$CLASS" == "GLACIER" ]]; then
+      echo "$KEY" >> $OUTPUT_FILE
+    fi
+  done
+
+  # Check for pagination token
+  NEXT_TOKEN=$(echo "$RESPONSE" | grep -oP '"NextContinuationToken": "\K[^"]+')
+
+  # Break the loop if there is no next token
+  if [[ -z "$NEXT_TOKEN" ]]; then
+    break
+  fi
+done
+
+echo "List of Glacier files within date range and prefix has been saved to $OUTPUT_FILE"
