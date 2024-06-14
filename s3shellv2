@@ -1,75 +1,39 @@
 #!/bin/bash
 
 BUCKET_NAME="your-bucket-name"
-PREFIX="your-prefix/"  # Specify the prefix (folder) you want to query
-START_DATE="2023-01-01T00:00:00Z"
-END_DATE="2023-12-31T23:59:59Z"
+PREFIX="your-prefix/"  # Specify the prefix (folder) you want to query, leave empty if no prefix is needed
 OUTPUT_FILE="glacier-files.txt"
 
 # Initialize the output file
 > $OUTPUT_FILE
 
-# Function to convert date to epoch for comparison
-date_to_epoch() {
-  date -d "$1" +"%s"
-}
-
-# Convert START_DATE and END_DATE to epoch
-START_EPOCH=$(date_to_epoch "$START_DATE")
-END_EPOCH=$(date_to_epoch "$END_DATE")
-
-# Function to extract epoch dates from filenames
-extract_epochs_from_filename() {
-  local filename=$1
-  # Extract the epoch parts from the filename using provided regex
-  local end_epoch=$(echo "$filename" | grep -oP '\d{10}(?=_\d{10})')
-  local start_epoch=$(echo "$filename" | grep -oP '(?<=_\d{10}_)\d{10}')
-  echo "$start_epoch $end_epoch"
-}
-
 # Paginate through the list of objects
 NEXT_TOKEN=""
 while : ; do
   if [[ -z "$NEXT_TOKEN" ]]; then
-    RESPONSE=$(aws s3api list-objects-v2 --bucket "$BUCKET_NAME" --prefix "$PREFIX" --query "Contents[?StorageClass=='GLACIER']" --output json)
+    if [[ -z "$PREFIX" ]]; then
+      RESPONSE=$(aws s3api list-objects-v2 --bucket "$BUCKET_NAME" --query "Contents[?StorageClass=='GLACIER'].Key" --output text)
+    else
+      RESPONSE=$(aws s3api list-objects-v2 --bucket "$BUCKET_NAME" --prefix "$PREFIX" --query "Contents[?StorageClass=='GLACIER'].Key" --output text)
+    fi
   else
-    RESPONSE=$(aws s3api list-objects-v2 --bucket "$BUCKET_NAME" --prefix "$PREFIX" --query "Contents[?StorageClass=='GLACIER']" --output json --starting-token "$NEXT_TOKEN")
+    if [[ -z "$PREFIX" ]]; then
+      RESPONSE=$(aws s3api list-objects-v2 --bucket "$BUCKET_NAME" --query "Contents[?StorageClass=='GLACIER'].Key" --output text --starting-token "$NEXT_TOKEN")
+    else
+      RESPONSE=$(aws s3api list-objects-v2 --bucket "$BUCKET_NAME" --prefix "$PREFIX" --query "Contents[?StorageClass=='GLACIER'].Key" --output text --starting-token "$NEXT_TOKEN")
+    fi
   fi
 
-  # Extract Keys
-  KEYS=$(echo "$RESPONSE" | grep -oP '"Key": "\K[^"]+')
-
-  # Iterate through each object and filter by the dates in the filename
-  IFS=$'\n'
-  for KEY in $KEYS; do
-    EPOCHS=$(extract_epochs_from_filename "$KEY")
-    START_FILE_EPOCH=$(echo "$EPOCHS" | awk '{print $1}')
-    END_FILE_EPOCH=$(echo "$EPOCHS" | awk '{print $2}')
-
-    # Debugging output
-    echo "Processing file: $KEY"
-    echo "Start Epoch: $START_FILE_EPOCH"
-    echo "End Epoch: $END_FILE_EPOCH"
-
-    # Check if extracted epochs are valid numbers
-    if [[ ! "$START_FILE_EPOCH" =~ ^[0-9]+$ ]] || [[ ! "$END_FILE_EPOCH" =~ ^[0-9]+$ ]]; then
-      echo "Skipping file due to invalid epoch format: $KEY"
-      continue
-    fi
-
-    # Check if object is within date range
-    if [[ "$START_FILE_EPOCH" -ge "$START_EPOCH" && "$END_FILE_EPOCH" -le "$END_EPOCH" ]]; then
-      echo "$KEY" >> $OUTPUT_FILE
-    fi
-  done
-
   # Check for pagination token
-  NEXT_TOKEN=$(echo "$RESPONSE" | grep -oP '"NextContinuationToken": "\K[^"]+')
+  NEXT_TOKEN=$(aws s3api list-objects-v2 --bucket "$BUCKET_NAME" --prefix "$PREFIX" --query "NextContinuationToken" --output text)
+
+  # Append response to the output file
+  echo "$RESPONSE" >> $OUTPUT_FILE
 
   # Break the loop if there is no next token
-  if [[ -z "$NEXT_TOKEN" ]]; then
+  if [[ "$NEXT_TOKEN" == "None" ]]; then
     break
   fi
 done
 
-echo "List of Glacier files within date range and prefix has been saved to $OUTPUT_FILE"
+echo "List of Glacier files has been saved to $OUTPUT_FILE"
