@@ -18,32 +18,36 @@ date_to_epoch() {
 START_EPOCH=$(date_to_epoch "$START_DATE")
 END_EPOCH=$(date_to_epoch "$END_DATE")
 
+# Function to extract epoch dates from filenames
+extract_epochs_from_filename() {
+  local filename=$1
+  # Extract the epoch parts from the filename
+  local start_epoch=$(echo "$filename" | grep -oP '_\K[0-9]{10}(?=_)')
+  local end_epoch=$(echo "$filename" | grep -oP '_\K[0-9]{10}(?=_db_)')
+  echo "$start_epoch $end_epoch"
+}
+
 # Paginate through the list of objects
 NEXT_TOKEN=""
 while : ; do
   if [[ -z "$NEXT_TOKEN" ]]; then
-    RESPONSE=$(aws s3api list-objects-v2 --bucket "$BUCKET_NAME" --prefix "$PREFIX" --output json)
+    RESPONSE=$(aws s3api list-objects-v2 --bucket "$BUCKET_NAME" --prefix "$PREFIX" --query "Contents[?StorageClass=='GLACIER']" --output json)
   else
-    RESPONSE=$(aws s3api list-objects-v2 --bucket "$BUCKET_NAME" --prefix "$PREFIX" --output json --starting-token "$NEXT_TOKEN")
+    RESPONSE=$(aws s3api list-objects-v2 --bucket "$BUCKET_NAME" --prefix "$PREFIX" --query "Contents[?StorageClass=='GLACIER']" --output json --starting-token "$NEXT_TOKEN")
   fi
 
-  # Extract Keys, LastModified, and StorageClass
+  # Extract Keys
   KEYS=$(echo "$RESPONSE" | grep -oP '"Key": "\K[^"]+')
-  LAST_MODIFIED=$(echo "$RESPONSE" | grep -oP '"LastModified": "\K[^"]+')
-  STORAGE_CLASS=$(echo "$RESPONSE" | grep -oP '"StorageClass": "\K[^"]+')
 
-  # Iterate through each object and filter by date and storage class
+  # Iterate through each object and filter by the dates in the filename
   IFS=$'\n'
-  for i in $(seq 0 $(($(echo "$KEYS" | wc -l) - 1))); do
-    KEY=$(echo "$KEYS" | sed -n "$((i + 1))p")
-    MODIFIED=$(echo "$LAST_MODIFIED" | sed -n "$((i + 1))p")
-    CLASS=$(echo "$STORAGE_CLASS" | sed -n "$((i + 1))p")
+  for KEY in $KEYS; do
+    EPOCHS=$(extract_epochs_from_filename "$KEY")
+    START_FILE_EPOCH=$(echo "$EPOCHS" | awk '{print $1}')
+    END_FILE_EPOCH=$(echo "$EPOCHS" | awk '{print $2}')
 
-    # Convert LastModified to epoch
-    MODIFIED_EPOCH=$(date_to_epoch "$MODIFIED")
-
-    # Check if object is within date range and in Glacier storage class
-    if [[ "$MODIFIED_EPOCH" -ge "$START_EPOCH" && "$MODIFIED_EPOCH" -le "$END_EPOCH" && "$CLASS" == "GLACIER" ]]; then
+    # Check if object is within date range
+    if [[ "$START_FILE_EPOCH" -ge "$START_EPOCH" && "$END_FILE_EPOCH" -le "$END_EPOCH" ]]; then
       echo "$KEY" >> $OUTPUT_FILE
     fi
   done
