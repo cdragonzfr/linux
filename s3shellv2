@@ -4,13 +4,9 @@
 bucket_name="your-bucket-name"
 prefix=""  # e.g., "your/prefix/" if needed
 
-# Date range in Zulu time format
-start_date="2023-12-01T00:00:00Z"
-end_date="2023-12-31T23:59:59Z"
-
-# Convert Zulu dates to epoch
-start_epoch=$(date -d "$start_date" +%s)
-end_epoch=$(date -d "$end_date" +%s)
+# Date range in "yyyy-mm-dd" format
+start_date="2023-12-01"
+end_date="2023-12-31"
 
 # Function to list objects in S3 bucket
 list_s3_objects() {
@@ -53,21 +49,20 @@ done
 echo "Successfully written ${#filenames[@]} filenames to filenames.csv"
 
 # Read filenames.csv and process each line
-echo "Filename,StartEpoch,EndEpoch" > filtered_filenames.csv
+echo "Filename" > filtered_filenames.csv
 while IFS=, read -r filename; do
     # Skip the header line
     if [[ "$filename" == "Filename" ]]; then
         continue
     fi
     
-    # Extract start and end epoch from the filename
-    start_epoch_from_filename=$(echo "$filename" | awk -F'_' '{print $(NF-2)}')
-    end_epoch_from_filename=$(echo "$filename" | awk -F'_' '{print $(NF-1)}')
+    # Extract date from the filename (assuming format "yyyy-mm-dd" appears in the filename)
+    file_date=$(echo "$filename" | grep -o '[0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}')
 
-    # Check if the epochs fall within the specified date range
-    if [[ "$start_epoch_from_filename" -ge "$start_epoch" && "$end_epoch_from_filename" -le "$end_epoch" ]]; then
+    # Check if the file date falls within the specified date range
+    if [[ "$file_date" > "$start_date" && "$file_date" < "$end_date" ]] || [[ "$file_date" == "$start_date" ]] || [[ "$file_date" == "$end_date" ]]; then
         # Write to the new CSV file
-        echo "$filename,$start_epoch_from_filename,$end_epoch_from_filename" >> filtered_filenames.csv
+        echo "$filename" >> filtered_filenames.csv
     fi
 done < filenames.csv
 
