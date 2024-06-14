@@ -46,6 +46,17 @@ while : ; do
     START_FILE_EPOCH=$(echo "$EPOCHS" | awk '{print $1}')
     END_FILE_EPOCH=$(echo "$EPOCHS" | awk '{print $2}')
 
+    # Debugging output
+    echo "Processing file: $KEY"
+    echo "Start Epoch: $START_FILE_EPOCH"
+    echo "End Epoch: $END_FILE_EPOCH"
+
+    # Check if extracted epochs are valid numbers
+    if [[ ! "$START_FILE_EPOCH" =~ ^[0-9]+$ ]] || [[ ! "$END_FILE_EPOCH" =~ ^[0-9]+$ ]]; then
+      echo "Skipping file due to invalid epoch format: $KEY"
+      continue
+    fi
+
     # Check if object is within date range
     if [[ "$START_FILE_EPOCH" -ge "$START_EPOCH" && "$END_FILE_EPOCH" -le "$END_EPOCH" ]]; then
       echo "$KEY" >> $OUTPUT_FILE
