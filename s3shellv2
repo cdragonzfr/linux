@@ -22,8 +22,8 @@ END_EPOCH=$(date_to_epoch "$END_DATE")
 extract_epochs_from_filename() {
   local filename=$1
   # Extract the epoch parts from the filename
-  local start_epoch=$(echo "$filename" | grep -oP '_\K[0-9]{10}(?=_)')
-  local end_epoch=$(echo "$filename" | grep -oP '_\K[0-9]{10}(?=_db_)')
+  local end_epoch=$(echo "$filename" | grep -oP '_\K[0-9]{10}(?=_[0-9]{10}_160_)')
+  local start_epoch=$(echo "$filename" | grep -oP '_\K[0-9]{10}(?=_160_)')
   echo "$start_epoch $end_epoch"
 }
 
