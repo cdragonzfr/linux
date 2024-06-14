@@ -1,46 +1,45 @@
 #!/bin/bash
 
-BUCKET_NAME="your-bucket-name"
-PREFIX="your-prefix/"  # Specify the prefix (folder) you want to query, leave empty if no prefix is needed
-OUTPUT_FILE="glacier-files.txt"
+# Specify your bucket name and prefix if needed
+bucket_name="your-bucket-name"
+prefix=""  # e.g., "your/prefix/" if needed
 
-# Initialize the output file
-> $OUTPUT_FILE
+# Function to list objects in S3 bucket
+list_s3_objects() {
+    local continuation_token=$1
+    if [ -z "$continuation_token" ]; then
+        aws s3api list-objects-v2 --bucket "$bucket_name" --prefix "$prefix"
+    else
+        aws s3api list-objects-v2 --bucket "$bucket_name" --prefix "$prefix" --continuation-token "$continuation_token"
+    fi
+}
 
-# Paginate through the list of objects
-NEXT_TOKEN=""
+# Initialize variables
+filenames=()
+continuation_token=""
+
+# Collect all filenames
 while : ; do
-  if [[ -z "$NEXT_TOKEN" ]]; then
-    if [[ -z "$PREFIX" ]]; then
-      RESPONSE=$(aws s3api list-objects-v2 --bucket "$BUCKET_NAME" --query "Contents[?StorageClass=='GLACIER'].Key" --output text)
+    if [ -z "$continuation_token" ]; then
+        result=$(list_s3_objects)
     else
-      RESPONSE=$(aws s3api list-objects-v2 --bucket "$BUCKET_NAME" --prefix "$PREFIX" --query "Contents[?StorageClass=='GLACIER'].Key" --output text)
+        result=$(list_s3_objects "$continuation_token")
     fi
-  else
-    if [[ -z "$PREFIX" ]]; then
-      RESPONSE=$(aws s3api list-objects-v2 --bucket "$BUCKET_NAME" --query "Contents[?StorageClass=='GLACIER'].Key" --output text --starting-token "$NEXT_TOKEN")
-    else
-      RESPONSE=$(aws s3api list-objects-v2 --bucket "$BUCKET_NAME" --prefix "$PREFIX" --query "Contents[?StorageClass=='GLACIER'].Key" --output text --starting-token "$NEXT_TOKEN")
+
+    # Extract filenames and append to array
+    filenames+=($(echo "$result" | grep -o '"Key": "[^"]*' | sed 's/"Key": "//'))
+
+    # Check for continuation token
+    continuation_token=$(echo "$result" | grep -o '"NextContinuationToken": "[^"]*' | sed 's/"NextContinuationToken": "//')
+    if [ -z "$continuation_token" ]; then
+        break
     fi
-  fi
-
-  # Append response to the output file
-  echo "$RESPONSE" >> $OUTPUT_FILE
-
-  # Check for pagination token
-  if [[ -z "$PREFIX" ]]; then
-    NEXT_TOKEN=$(aws s3api list-objects-v2 --bucket "$BUCKET_NAME" --query "NextContinuationToken" --output text)
-  else
-    NEXT_TOKEN=$(aws s3api list-objects-v2 --bucket "$BUCKET_NAME" --prefix "$PREFIX" --query "NextContinuationToken" --output text)
-  fi
-
-  # Break the loop if there is no next token
-  if [[ "$NEXT_TOKEN" == "None" ]]; then
-    break
-  fi
 done
 
-# Ensure the output file has one filename per line
-tr ' ' '\n' < $OUTPUT_FILE > temp_file && mv temp_file $OUTPUT_FILE
+# Write filenames to CSV
+echo "Filename" > filenames.csv
+for filename in "${filenames[@]}"; do
+    echo "$filename" >> filenames.csv
+done
 
-echo "List of Glacier files has been saved to $OUTPUT_FILE"
+echo "Successfully written ${#filenames[@]} filenames to filenames.csv"
