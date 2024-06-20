@@ -1,13 +1,13 @@
 #!/bin/bash
 
-# Ensure the script takes exactly two arguments: the input file and the destination bucket
+# Ensure the script takes exactly two arguments: the input file and the destination directory
 if [ "$#" -ne 2 ]; then
-    echo "Usage: $0 <input_file> <destination_bucket>"
+    echo "Usage: $0 <input_file> <destination_directory>"
     exit 1
 fi
 
 input_file="$1"
-destination_bucket="$2"
+destination_directory="$2"
 max_jobs=10  # Adjust based on your rate limit
 max_retries=3  # Number of retries for each request
 retry_delay=5  # Delay between retries in seconds
@@ -19,7 +19,7 @@ copy_object() {
 
     while [ $attempt -lt $max_retries ]; do
         echo "Attempting to copy: $key (Attempt: $((attempt + 1)))"
-        aws s3 cp "s3://$source_bucket/$key" "s3://$destination_bucket/$key"
+        aws s3 cp "s3://$bucket_name/$key" "$destination_directory/$key"
         if [ $? -eq 0 ]; then
             echo "Successfully copied: $key"
             echo "$key" >> "$processed_log"
