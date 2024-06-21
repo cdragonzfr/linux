@@ -29,6 +29,8 @@ extract_and_move_tar() {
 
 export -f extract_and_move_tar
 export thawedb_dir
+export destination_dir
+export max_retries
 
-# Use GNU Parallel to run the extraction with 10 threads
-cat "$input_file" | parallel -j $num_threads extract_and_move_tar {}
+# Use xargs to run the extraction with 10 parallel processes
+cat "$input_file" | xargs -P $num_threads -I {} bash -c 'extract_and_move_tar "$@"' _ {}
