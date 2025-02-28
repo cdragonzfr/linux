@@ -184,3 +184,80 @@ def download_tokens(auth_token, flock_id, Bary_web_hash):
 
         except requests.RequestException as e:
             logging.error(f"Failed to download {token_name}: {e}")
+
+
+
+_____________________________
+
+
+import requests
+import argparse
+import os
+import shutil
+import logging
+
+# Set up logging
+logging.basicConfig(filename='token_download.log', level=logging.INFO, 
+                    format='%(asctime)s - %(levelname)s - %(message)s')
+
+# Approved token types that can be downloaded
+approved_tokens = {"web-image", "qr-code"}  # Add more as needed
+
+def download_tokens(auth_token, flock_id, Bary_web_hash):
+    """Fetch tokens and download them to their appropriate hostname directories."""
+
+    results = fetch(auth_token, Bary_web_hash)  # Fetch the flock tokens
+
+    for item in results['tokens']:
+        memo = item.get('memo', '')
+        parts = memo.split(',')
+
+        if len(parts) < 3:
+            logging.warning(f"Skipping token: Invalid memo format - {memo}")
+            continue
+
+        hostname = parts[0].upper()  # Standardize hostname to uppercase
+        location = parts[2]          # Path from memo
+        token_name = os.path.basename(location)  # Extract filename
+        canarytoken = item.get('canarytoken', '')  # Extract canarytoken
+        kind = item.get('kind', '').lower()  # Normalize kind to lowercase
+
+        # Check if token kind is in the approved list
+        if kind not in approved_tokens:
+            logging.warning(f"Skipping token {token_name}: Kind '{kind}' is not approved for download.")
+            continue  # Skip to the next token
+
+        # Ensure hostname directory exists
+        if not os.path.exists(hostname):
+            os.makedirs(hostname)
+            logging.info(f"Created directory: {hostname}")
+
+        # Ensure canarytoken is available
+        if not canarytoken:
+            logging.warning(f"Skipping token {token_name}: Missing canarytoken in results.")
+            continue
+
+        # Define API URL and payload for downloading
+        url = 'https://EXAMPLE.canary.tools/api/v1/canarytoken/download'
+        payload = {
+            'auth_token': auth_token,
+            'canarytoken': canarytoken
+        }
+
+        # Download token using GET request
+        try:
+            response = requests.get(url, params=payload, allow_redirects=True, stream=True, verify=False)
+            response.raise_for_status()  # Raise an error for bad responses (4xx/5xx)
+
+            # Save the token file temporarily
+            temp_filename = f"temp_{token_name}"
+            with open(temp_filename, 'wb') as f:
+                for chunk in response.iter_content(chunk_size=8192):
+                    f.write(chunk)
+
+            logging.info(f"Downloaded token: {token_name}")
+
+            # Move and rename the token to its correct folder
+            new_path = os.path.join(hostname, token_name)
+            shutil.move(temp_filename, new_path)
+            logging
