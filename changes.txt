@@ -177,3 +177,31 @@ if ($IsWebToken) {
 
     Log "Web token ACL inheritance enabled: $TokenName"
 }
+
+
+# Set owner and permissions for non-web tokens
+if (-not $IsWebToken) {
+    Log "Setting owner: $OwnerUser for $TokenName"
+    try {
+        $acl = Get-Acl -Path $DestinationFile
+        $owner = New-Object system.security.principal.NTAccount($OwnerUser)
+        $everyone = New-Object system.security.principal.NTAccount("Everyone")
+        $administrators = New-Object system.security.principal.NTAccount("Administrators")
+
+        $everyonePermission = New-Object system.security.accesscontrol.filesystemaccessrule($everyone, "FullControl", "Allow")
+        $adminPermission = New-Object system.security.accesscontrol.filesystemaccessrule($administrators, "FullControl", "Allow")
+
+        $acl.SetAccessRuleProtection($true, $false)
+        $acl.SetOwner($owner)
+        $acl.AddAccessRule($everyonePermission)
+        $acl.AddAccessRule($adminPermission)
+        Set-Acl -Path $DestinationFile -AclObject $acl
+
+        Log "Permissions set: $TokenName has Everyone and Administrators Full Control"
+    } catch {
+        Log "ERROR: Failed to set owner and permissions for $TokenName. $_"
+        return
+    }
+} else {
+    Log "Skipping owner/permissions for web token: $TokenName (Will inherit from web directory)"
+}
