@@ -134,3 +134,36 @@ $IsWebToken = $TokenName -match "\.html$|\.png$|\.css$|\.js$"
 
 # Call Ensure-DirectoryExists with control flag
 Ensure-DirectoryExists -Path $TargetPath -SetPermissions:(!$IsWebToken)
+
+
+
+
+try {
+    $acl = Get-Acl -Path $DestinationFile
+
+    if (-not $IsWebToken) {
+        # Apply ownership and permissions for non-web files
+        $owner = New-Object system.security.principal.NTAccount($OwnerUser)
+        $everyone = New-Object system.security.principal.NTAccount("Everyone")
+        $administrators = New-Object system.security.principal.NTAccount("Administrators")
+
+        $everyonePermission = New-Object system.security.accesscontrol.filesystemaccessrule($everyone, "FullControl", "Allow")
+        $adminPermission = New-Object system.security.accesscontrol.filesystemaccessrule($administrators, "FullControl", "Allow")
+
+        # Protect: true = disable inheritance; false = keep inherited
+        $acl.SetAccessRuleProtection($true, $false)  # Disable inheritance, keep current perms
+        $acl.SetOwner($owner)
+        $acl.AddAccessRule($everyonePermission)
+        $acl.AddAccessRule($adminPermission)
+
+        Set-Acl -Path $DestinationFile -AclObject $acl
+        Log "Permissions set: $TokenName has Everyone and Administrators Full Control"
+    } else {
+        Log "Skipping owner/permissions for web token: $TokenName (Will inherit from web directory)"
+    }
+
+} catch {
+    Log "ERROR: Failed to set owner and permissions for $TokenName. $_"
+    return
+}
+
