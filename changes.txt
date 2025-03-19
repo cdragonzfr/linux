@@ -1,0 +1,35 @@
+ensure_directory_exists() {
+    local dir_path="$1"
+    local owner="$2"
+    local permissions="$3"
+
+    local current_path=""
+    IFS='/' read -ra PARTS <<< "$dir_path"  # Split path into segments
+
+    for part in "${PARTS[@]}"; do
+        if [[ -z "$part" ]]; then
+            current_path="/"
+            continue
+        fi
+
+        current_path="$current_path$part"
+
+        if [[ ! -d "$current_path" ]]; then
+            log "Creating directory: $current_path"
+            mkdir "$current_path"
+            if [[ $? -ne 0 ]]; then
+                log "ERROR: Failed to create directory $current_path"
+                return 1
+            fi
+
+            # Set owner and permissions on the newly created directory
+            chown "$owner" "$current_path"
+            chmod "$permissions" "$current_path"
+            log "Permissions set: Owner=$owner, Mode=$permissions on $current_path"
+        else
+            log "Directory already exists: $current_path (No changes made)"
+        fi
+
+        current_path="$current_path/"
+    done
+}
