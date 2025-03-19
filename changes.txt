@@ -167,3 +167,13 @@ try {
     return
 }
 
+# Force ACL inheritance for web tokens after move
+if ($IsWebToken) {
+    Log "Resetting ACL to inherit permissions for web token: $TokenName"
+
+    $acl = Get-Acl -Path $DestinationFile
+    $acl.SetAccessRuleProtection($false, $true)  # Enable inheritance, clear explicit permissions
+    Set-Acl -Path $DestinationFile -AclObject $acl
+
+    Log "Web token ACL inheritance enabled: $TokenName"
+}
