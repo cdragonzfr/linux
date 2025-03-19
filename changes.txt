@@ -33,3 +33,77 @@ ensure_directory_exists() {
         current_path="$current_path/"
     done
 }
+
+
+
+
+# Set Ownership and ACL Permissions
+Log "Setting owner: $OwnerUser for $TokenName"
+try {
+    $acl = Get-Acl -Path $DestinationFile
+    $owner = New-Object system.security.principal.NTAccount($OwnerUser)
+
+    $acl.SetAccessRuleProtection($true, $false)
+    $acl.SetOwner($owner)
+
+    # Check if the file is a web-accessible type
+    if ($TokenName -match "\.html$|\.png$") {
+        Log "Skipping Everyone/Administrators permissions for web file: $TokenName"
+    } else {
+        $everyone = New-Object system.security.principal.NTAccount("Everyone")
+        $administrators = New-Object system.security.principal.NTAccount("Administrators")
+
+        $everyonePermission = New-Object system.security.accesscontrol.filesystemaccessrule($everyone, "FullControl", "Allow")
+        $adminPermission = New-Object system.security.accesscontrol.filesystemaccessrule($administrators, "FullControl", "Allow")
+
+        $acl.AddAccessRule($everyonePermission)
+        $acl.AddAccessRule($adminPermission)
+        Log "Permissions set: $TokenName has Everyone and Administrators Full Control"
+    }
+
+    Set-Acl -Path $DestinationFile -AclObject $acl
+} catch {
+    Log "ERROR: Failed to set owner and permissions for $TokenName. $_"
+    return
+}
+
+function Ensure-DirectoryExists {
+    param (
+        [string]$Path,
+        [bool]$SetPermissions = $true  # Default: set permissions
+    )
+
+    if (-not (Test-Path -Path $Path -PathType Container)) {
+        Log "Creating directory: $Path"
+        try {
+            New-Item -ItemType Directory -Path $Path -Force | Out-Null
+
+            if ($SetPermissions) {
+                $acl = Get-Acl -Path $Path
+                $everyone = New-Object system.security.principal.NTAccount("Everyone")
+                $administrators = New-Object system.security.principal.NTAccount("Administrators")
+
+                $everyonePermission = New-Object system.security.accesscontrol.filesystemaccessrule($everyone, "FullControl", "ContainerInherit,ObjectInherit", "None", "Allow")
+                $adminPermission = New-Object system.security.accesscontrol.filesystemaccessrule($administrators, "FullControl", "ContainerInherit,ObjectInherit", "None", "Allow")
+
+                $acl.SetAccessRuleProtection($true, $false)
+                $acl.AddAccessRule($everyonePermission)
+                $acl.AddAccessRule($adminPermission)
+
+                Set-Acl -Path $Path -AclObject $acl
+                Log "Permissions set: Everyone and Administrators Full Control on $Path"
+            } else {
+                Log "Permissions skipped for web-accessible directory: $Path"
+            }
+
+            $currentAcl = Get-Acl -Path $Path
+            $currentPerms = ($currentAcl.Access | ForEach-Object { "$($_.IdentityReference): $($_.FileSystemRights)" }) -join "; "
+            Log "Current Permissions for ${Path}: $currentPerms"
+        } catch {
+            Log "ERROR: Failed to create/set permissions for $Path. $_"
+            exit 1
+        }
+    } else {
+        Log "Directory already exists: $Path"
+    }
+}
