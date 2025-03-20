@@ -205,3 +205,109 @@ if (-not $IsWebToken) {
 } else {
     Log "Skipping owner/permissions for web token: $TokenName (Will inherit from web directory)"
 }
+
+
+import requests
+import argparse
+import os
+import shutil
+import logging
+import zipfile
+
+# Set up logging
+logging.basicConfig(filename='token_download.log', level=logging.INFO, 
+                    format='%(asctime)s - %(levelname)s - %(message)s')
+
+# Approved token types
+approved_tokens = {"web-image", "qr-code", "azure-id"}
+
+def download_tokens(auth_token, flock_id, Bary_web_hash):
+    """Fetch tokens and download them to their appropriate hostname directories."""
+
+    results = fetch(auth_token, Bary_web_hash)
+
+    for item in results['tokens']:
+        memo = item.get('memo', '')
+        parts = memo.split(',')
+
+        if len(parts) < 3:
+            logging.warning(f"Skipping token: Invalid memo format - {memo}")
+            continue
+
+        kind = item.get('kind', '').lower()
+        canarytoken = item.get('canarytoken', '')
+
+        # Skip if kind not approved
+        if kind not in approved_tokens:
+            logging.warning(f"Skipping token {memo}: Kind '{kind}' is not approved for download.")
+            continue
+
+        # Skip if no canarytoken
+        if not canarytoken:
+            logging.warning(f"Skipping token {memo}: Missing canarytoken.")
+            continue
+
+        hostname = parts[0].upper()
+        location = parts[2]
+        token_name = os.path.basename(location)  # Original file name from memo
+
+        if not os.path.exists(hostname):
+            os.makedirs(hostname)
+            logging.info(f"Created directory: {hostname}")
+
+        url = 'https://EXAMPLE.canary.tools/api/v1/canarytoken/download'
+        payload = {
+            'auth_token': auth_token,
+            'canarytoken': canarytoken
+        }
+
+        try:
+            response = requests.get(url, params=payload, allow_redirects=True, stream=True, verify=False)
+            response.raise_for_status()
+
+            temp_filename = f"temp_{token_name}"
+            with open(temp_filename, 'wb') as f:
+                for chunk in response.iter_content(chunk_size=8192):
+                    f.write(chunk)
+
+            logging.info(f"Downloaded token: {token_name}")
+
+            # Special handling for azure-id
+            if kind == "azure-id":
+                # Rename .pem to .zip
+                zip_token_name = os.path.splitext(token_name)[0] + ".zip"
+                zip_temp_filename = f"temp_{zip_token_name}"
+                os.rename(temp_filename, zip_temp_filename)
+                logging.info(f"Renamed .pem to .zip: {zip_temp_filename}")
+
+                # Move zip to destination folder
+                dest_zip_path = os.path.join(hostname, zip_token_name)
+                shutil.move(zip_temp_filename, dest_zip_path)
+                logging.info(f"Moved ZIP to: {dest_zip_path}")
+
+                # Unzip contents
+                try:
+                    with zipfile.ZipFile(dest_zip_path, 'r') as zip_ref:
+                        zip_ref.extractall(hostname)
+                    logging.info(f"Unzipped {zip_token_name} into {hostname}")
+
+                    # Optional: Delete the zip file after extraction
+                    os.remove(dest_zip_path)
+                    logging.info(f"Deleted ZIP archive: {dest_zip_path}")
+                except zipfile.BadZipFile:
+                    logging.error(f"Failed to unzip: {dest_zip_path} is not a valid ZIP file.")
+
+            else:
+                # Standard move for other token types
+                new_path = os.path.join(hostname, token_name)
+                shutil.move(temp_filename, new_path)
+                logging.info(f"Renamed and moved token to: {new_path}")
+
+                if os.path.exists(new_path):
+                    logging.info(f"Verified: Token {token_name} is in {hostname} folder.")
+                else:
+                    logging.error(f"Token {token_name} missing after move!")
+
+        except requests.RequestException as e:
+            logging.error(f"Failed to download {token_name}: {e}")
+
