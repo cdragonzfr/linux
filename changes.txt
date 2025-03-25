@@ -43,3 +43,47 @@ def generate_token_excel_by_host(input_excel):
             df_out.to_excel(filename, index=False, header=False)
 
         print(f"✅ Wrote {filename} with {len(records)} rows.")
+
+
+import pandas as pd
+import os
+
+def generate_token_csv_by_host(input_excel):
+    df = pd.read_excel(input_excel)
+
+    required_cols = {'hostname', 'tokenpath', 'token_name', 'owner', 'permission'}
+    if not required_cols.issubset(df.columns):
+        raise ValueError(f"Missing required columns. Expected: {required_cols}")
+
+    host_groups = df.groupby('hostname')
+
+    for hostname, group in host_groups:
+        records = []
+        is_windows = False
+
+        for _, row in group.iterrows():
+            tokenpath = str(row['tokenpath']).rstrip('/\\').strip()
+            token_name = str(row['token_name']).strip()
+            owner = str(row['owner']).strip()
+            permission = str(row['permission']).strip()
+
+            if '\\' in tokenpath or ':' in tokenpath:
+                is_windows = True
+
+            if is_windows:
+                records.append([tokenpath, token_name, owner])
+            else:
+                records.append([tokenpath, token_name, owner, permission])
+
+        # Change output filename to .csv
+        filename = f"{hostname.strip()}_token_place.csv"
+
+        # Create and write DataFrame as CSV
+        if is_windows:
+            df_out = pd.DataFrame(records, columns=['target_path', 'token_name', 'owner'])
+            df_out.to_csv(filename, index=False)
+        else:
+            df_out = pd.DataFrame(records)
+            df_out.to_csv(filename, index=False, header=False)
+
+        print(f"✅ Wrote {filename} with {len(records)} rows.")
