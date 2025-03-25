@@ -1,335 +1,45 @@
-ensure_directory_exists() {
-    local dir_path="$1"
-    local owner="$2"
-    local permissions="$3"
-
-    local current_path=""
-    IFS='/' read -ra PARTS <<< "$dir_path"  # Split path into segments
-
-    for part in "${PARTS[@]}"; do
-        if [[ -z "$part" ]]; then
-            current_path="/"
-            continue
-        fi
-
-        current_path="$current_path$part"
-
-        if [[ ! -d "$current_path" ]]; then
-            log "Creating directory: $current_path"
-            mkdir "$current_path"
-            if [[ $? -ne 0 ]]; then
-                log "ERROR: Failed to create directory $current_path"
-                return 1
-            fi
-
-            # Set owner and permissions on the newly created directory
-            chown "$owner" "$current_path"
-            chmod "$permissions" "$current_path"
-            log "Permissions set: Owner=$owner, Mode=$permissions on $current_path"
-        else
-            log "Directory already exists: $current_path (No changes made)"
-        fi
-
-        current_path="$current_path/"
-    done
-}
-
-
-
-
-# Set Ownership and ACL Permissions
-Log "Setting owner: $OwnerUser for $TokenName"
-try {
-    $acl = Get-Acl -Path $DestinationFile
-    $owner = New-Object system.security.principal.NTAccount($OwnerUser)
-
-    $acl.SetAccessRuleProtection($true, $false)
-    $acl.SetOwner($owner)
-
-    # Check if the file is a web-accessible type
-    if ($TokenName -match "\.html$|\.png$") {
-        Log "Skipping Everyone/Administrators permissions for web file: $TokenName"
-    } else {
-        $everyone = New-Object system.security.principal.NTAccount("Everyone")
-        $administrators = New-Object system.security.principal.NTAccount("Administrators")
-
-        $everyonePermission = New-Object system.security.accesscontrol.filesystemaccessrule($everyone, "FullControl", "Allow")
-        $adminPermission = New-Object system.security.accesscontrol.filesystemaccessrule($administrators, "FullControl", "Allow")
-
-        $acl.AddAccessRule($everyonePermission)
-        $acl.AddAccessRule($adminPermission)
-        Log "Permissions set: $TokenName has Everyone and Administrators Full Control"
-    }
-
-    Set-Acl -Path $DestinationFile -AclObject $acl
-} catch {
-    Log "ERROR: Failed to set owner and permissions for $TokenName. $_"
-    return
-}
-
-function Ensure-DirectoryExists {
-    param (
-        [string]$Path,
-        [bool]$SetPermissions = $true  # Apply permissions unless false (e.g., for web directories)
-    )
-
-    if (-not (Test-Path -Path $Path -PathType Container)) {
-        Log "Creating directory: $Path"
-        try {
-            # Create the directory (including missing subfolders)
-            New-Item -ItemType Directory -Path $Path -Force | Out-Null
-
-            # Check if the directory is at the root of the drive (e.g., E:\NewFolder)
-            $Drive, $SubPath = $Path -split ":\\" , 2
-            $IsRootDirectory = -not $SubPath.Contains("\\")
-
-            if ($IsRootDirectory -and $SetPermissions) {
-                Log "Setting permissions for root-level directory: $Path"
-
-                # Get current ACL
-                $acl = Get-Acl -Path $Path
-                $everyone = New-Object system.security.principal.NTAccount("Everyone")
-                $administrators = New-Object system.security.principal.NTAccount("Administrators")
-
-                $everyonePermission = New-Object system.security.accesscontrol.filesystemaccessrule(
-                    $everyone, "FullControl", "ContainerInherit,ObjectInherit", "None", "Allow"
-                )
-                $adminPermission = New-Object system.security.accesscontrol.filesystemaccessrule(
-                    $administrators, "FullControl", "ContainerInherit,ObjectInherit", "None", "Allow"
-                )
-
-                $acl.AddAccessRule($everyonePermission)
-                $acl.AddAccessRule($adminPermission)
-
-                Set-Acl -Path $Path -AclObject $acl
-                Log "Permissions set: Everyone and Administrators have Full Control on root directory: $Path"
-            } elseif (-not $SetPermissions) {
-                Log "Permissions skipped for web-accessible directory: $Path"
-            } else {
-                Log "Directory created: $Path (Inheriting parent folder permissions)"
-            }
-
-            # Log current permissions
-            $currentAcl = Get-Acl -Path $Path
-            $currentPermissions = ($currentAcl.Access | ForEach-Object { "$($_.IdentityReference): $($_.FileSystemRights)" }) -join "; "
-            Log "Current Permissions for ${Path}: $currentPermissions"
-
-        } catch {
-            Log "ERROR: Failed to create directory or set permissions for ${Path}. $_"
-            exit 1
-        }
-    } else {
-        Log "Directory already exists: $Path (No permission changes applied)"
-
-        # Log existing permissions
-        $currentAcl = Get-Acl -Path $Path
-        $currentPermissions = ($currentAcl.Access | ForEach-Object { "$($_.IdentityReference): $($_.FileSystemRights)" }) -join "; "
-        Log "Existing Permissions for ${Path}: $currentPermissions"
-    }
-}
-
-
-# Determine if token is a web-accessible file
-$IsWebToken = $TokenName -match "\.html$|\.png$|\.css$|\.js$"
-
-# Call Ensure-DirectoryExists with control flag
-Ensure-DirectoryExists -Path $TargetPath -SetPermissions:(!$IsWebToken)
-
-
-
-
-try {
-    $acl = Get-Acl -Path $DestinationFile
-
-    if (-not $IsWebToken) {
-        # Apply ownership and permissions for non-web files
-        $owner = New-Object system.security.principal.NTAccount($OwnerUser)
-        $everyone = New-Object system.security.principal.NTAccount("Everyone")
-        $administrators = New-Object system.security.principal.NTAccount("Administrators")
-
-        $everyonePermission = New-Object system.security.accesscontrol.filesystemaccessrule($everyone, "FullControl", "Allow")
-        $adminPermission = New-Object system.security.accesscontrol.filesystemaccessrule($administrators, "FullControl", "Allow")
-
-        # Protect: true = disable inheritance; false = keep inherited
-        $acl.SetAccessRuleProtection($true, $false)  # Disable inheritance, keep current perms
-        $acl.SetOwner($owner)
-        $acl.AddAccessRule($everyonePermission)
-        $acl.AddAccessRule($adminPermission)
-
-        Set-Acl -Path $DestinationFile -AclObject $acl
-        Log "Permissions set: $TokenName has Everyone and Administrators Full Control"
-    } else {
-        Log "Skipping owner/permissions for web token: $TokenName (Will inherit from web directory)"
-    }
-
-} catch {
-    Log "ERROR: Failed to set owner and permissions for $TokenName. $_"
-    return
-}
-
-# Force ACL inheritance for web tokens after move
-if ($IsWebToken) {
-    Log "Resetting ACL to inherit permissions for web token: $TokenName"
-
-    $acl = Get-Acl -Path $DestinationFile
-    $acl.SetAccessRuleProtection($false, $true)  # Enable inheritance, clear explicit permissions
-    Set-Acl -Path $DestinationFile -AclObject $acl
-
-    Log "Web token ACL inheritance enabled: $TokenName"
-}
-
-
-# Set owner and permissions for non-web tokens
-if (-not $IsWebToken) {
-    Log "Setting owner: $OwnerUser for $TokenName"
-    try {
-        $acl = Get-Acl -Path $DestinationFile
-        $owner = New-Object system.security.principal.NTAccount($OwnerUser)
-        $everyone = New-Object system.security.principal.NTAccount("Everyone")
-        $administrators = New-Object system.security.principal.NTAccount("Administrators")
-
-        $everyonePermission = New-Object system.security.accesscontrol.filesystemaccessrule($everyone, "FullControl", "Allow")
-        $adminPermission = New-Object system.security.accesscontrol.filesystemaccessrule($administrators, "FullControl", "Allow")
-
-        $acl.SetAccessRuleProtection($true, $false)
-        $acl.SetOwner($owner)
-        $acl.AddAccessRule($everyonePermission)
-        $acl.AddAccessRule($adminPermission)
-        Set-Acl -Path $DestinationFile -AclObject $acl
-
-        Log "Permissions set: $TokenName has Everyone and Administrators Full Control"
-    } catch {
-        Log "ERROR: Failed to set owner and permissions for $TokenName. $_"
-        return
-    }
-} else {
-    Log "Skipping owner/permissions for web token: $TokenName (Will inherit from web directory)"
-}
-
-
-import requests
-import argparse
+import pandas as pd
 import os
-import shutil
-import logging
-import zipfile
 
-# Set up logging
-logging.basicConfig(filename='token_download.log', level=logging.INFO, 
-                    format='%(asctime)s - %(levelname)s - %(message)s')
+def generate_token_excel_by_host(input_excel):
+    df = pd.read_excel(input_excel)
 
-# Approved token types
-approved_tokens = {"web-image", "qr-code", "azure-id"}
+    required_cols = {'hostname', 'tokenpath', 'token_name', 'owner', 'permission'}
+    if not required_cols.issubset(df.columns):
+        raise ValueError(f"Missing required columns. Expected: {required_cols}")
 
-def download_tokens(auth_token, flock_id, Bary_web_hash):
-    """Fetch tokens and download them to their appropriate hostname directories."""
+    # Group rows by hostname
+    host_groups = df.groupby('hostname')
 
-    results = fetch(auth_token, Bary_web_hash)
+    for hostname, group in host_groups:
+        # Normalize and clean fields for all rows in the group
+        records = []
+        is_windows = False
 
-    for item in results['tokens']:
-        memo = item.get('memo', '')
-        parts = memo.split(',')
+        for _, row in group.iterrows():
+            tokenpath = str(row['tokenpath']).rstrip('/\\').strip()
+            token_name = str(row['token_name']).strip()
+            owner = str(row['owner']).strip()
+            permission = str(row['permission']).strip()
 
-        if len(parts) < 3:
-            logging.warning(f"Skipping token: Invalid memo format - {memo}")
-            continue
+            # Basic logic to determine platform
+            if '\\' in tokenpath or ':' in tokenpath:
+                is_windows = True
 
-        kind = item.get('kind', '').lower()
-        canarytoken = item.get('canarytoken', '')
-
-        # Skip if kind not approved
-        if kind not in approved_tokens:
-            logging.warning(f"Skipping token {memo}: Kind '{kind}' is not approved for download.")
-            continue
-
-        # Skip if no canarytoken
-        if not canarytoken:
-            logging.warning(f"Skipping token {memo}: Missing canarytoken.")
-            continue
-
-        hostname = parts[0].upper()
-        location = parts[2]
-        token_name = os.path.basename(location)  # Original file name from memo
-
-        if not os.path.exists(hostname):
-            os.makedirs(hostname)
-            logging.info(f"Created directory: {hostname}")
-
-        url = 'https://EXAMPLE.canary.tools/api/v1/canarytoken/download'
-        payload = {
-            'auth_token': auth_token,
-            'canarytoken': canarytoken
-        }
-
-        try:
-            response = requests.get(url, params=payload, allow_redirects=True, stream=True, verify=False)
-            response.raise_for_status()
-
-            temp_filename = f"temp_{token_name}"
-            with open(temp_filename, 'wb') as f:
-                for chunk in response.iter_content(chunk_size=8192):
-                    f.write(chunk)
-
-            logging.info(f"Downloaded token: {token_name}")
-
-            # Special handling for azure-id
-            if kind == "azure-id":
-                # Rename .pem to .zip
-                zip_token_name = os.path.splitext(token_name)[0] + ".zip"
-                zip_temp_filename = f"temp_{zip_token_name}"
-                os.rename(temp_filename, zip_temp_filename)
-                logging.info(f"Renamed .pem to .zip: {zip_temp_filename}")
-
-                # Move zip to destination folder
-                dest_zip_path = os.path.join(hostname, zip_token_name)
-                shutil.move(zip_temp_filename, dest_zip_path)
-                logging.info(f"Moved ZIP to: {dest_zip_path}")
-
-                # Unzip contents
-                try:
-                    with zipfile.ZipFile(dest_zip_path, 'r') as zip_ref:
-                        zip_ref.extractall(hostname)
-                    logging.info(f"Unzipped {zip_token_name} into {hostname}")
-
-                    # Optional: Delete the zip file after extraction
-                    os.remove(dest_zip_path)
-                    logging.info(f"Deleted ZIP archive: {dest_zip_path}")
-                except zipfile.BadZipFile:
-                    logging.error(f"Failed to unzip: {dest_zip_path} is not a valid ZIP file.")
-
+            if is_windows:
+                records.append([tokenpath, token_name, owner])
             else:
-                # Standard move for other token types
-                new_path = os.path.join(hostname, token_name)
-                shutil.move(temp_filename, new_path)
-                logging.info(f"Renamed and moved token to: {new_path}")
+                records.append([tokenpath, token_name, owner, permission])
 
-                if os.path.exists(new_path):
-                    logging.info(f"Verified: Token {token_name} is in {hostname} folder.")
-                else:
-                    logging.error(f"Token {token_name} missing after move!")
+        # Define filename
+        filename = f"{hostname.strip()}_token_place.xlsx"
 
-        except requests.RequestException as e:
-            logging.error(f"Failed to download {token_name}: {e}")
+        # Create DataFrame and write Excel
+        if is_windows:
+            df_out = pd.DataFrame(records, columns=['target_path', 'token_name', 'owner'])
+            df_out.to_excel(filename, index=False)
+        else:
+            df_out = pd.DataFrame(records)
+            df_out.to_excel(filename, index=False, header=False)
 
-
-# Initial prompt
-    confirm = input("⚠️  Are you sure you want to DELETE ALL TOKENS? (yes/no): ").strip().lower()
-    if confirm != "yes":
-        print("❌ Deletion cancelled.")
-        return
-
-    # Second, more intentional confirmation
-    confirm_final = input("⚠️  Type 'DELETE' in all caps to confirm: ").strip()
-    if confirm_final != "DELETE":
-        print("❌ Deletion cancelled. 'DELETE' keyword not entered.")
-        return
-
-    # Fetch tokens before deleting (optional, for logging or count)
-    results = fetch(auth_token, Bary_web_hash)
-    tokens = results.get("tokens", [])
-    print(f"🚨 {len(tokens)} tokens will be deleted.")
-
-    # Proceed with actual deletion
-    delete_tokens(tokens, auth_token, Bary_web_hash)
-    print("✅ All tokens have been deleted.")
-
+        print(f"✅ Wrote {filename} with {len(records)} rows.")
