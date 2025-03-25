@@ -311,3 +311,25 @@ def download_tokens(auth_token, flock_id, Bary_web_hash):
         except requests.RequestException as e:
             logging.error(f"Failed to download {token_name}: {e}")
 
+
+# Initial prompt
+    confirm = input("⚠️  Are you sure you want to DELETE ALL TOKENS? (yes/no): ").strip().lower()
+    if confirm != "yes":
+        print("❌ Deletion cancelled.")
+        return
+
+    # Second, more intentional confirmation
+    confirm_final = input("⚠️  Type 'DELETE' in all caps to confirm: ").strip()
+    if confirm_final != "DELETE":
+        print("❌ Deletion cancelled. 'DELETE' keyword not entered.")
+        return
+
+    # Fetch tokens before deleting (optional, for logging or count)
+    results = fetch(auth_token, Bary_web_hash)
+    tokens = results.get("tokens", [])
+    print(f"🚨 {len(tokens)} tokens will be deleted.")
+
+    # Proceed with actual deletion
+    delete_tokens(tokens, auth_token, Bary_web_hash)
+    print("✅ All tokens have been deleted.")
+
