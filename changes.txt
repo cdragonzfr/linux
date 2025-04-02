@@ -1,2 +1,1 @@
-| rex field=your_field "(?i)(?:https?:\/\/)?(?<full_host>[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})(?=\/|[\s\"'])"
-(?i)https?:\/\/(?<full_host>[^\/]+)
+... | rex field=details "User:\s(?<user>[^\;]+);\sSession:\s(?<session>[^\;]+);\sAuthentication Type:\s(?<auth_type>[^\;]+);\sIP Address:\s(?<ip_address>[^\;]+)"
