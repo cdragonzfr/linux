@@ -1,1 +1,1 @@
-... | rex field=details "User:\s(?<user>[^\;]+);\sSession:\s(?<session>[^\;]+);\sAuthentication Type:\s(?<auth_type>[^\;]+);\sIP Address:\s(?<ip_address>[^\;]+)"
+docker: Error response from daemon: failed to create task for container: failed to create shim task: OCI runtime create failed: runc create failed: unable to start container process: waiting for init preliminary setup: read init-p: connection reset by peer: unknown.
