@@ -168,3 +168,18 @@ Apr 04 17:18:12 redactedsystem systemd[1]: Failed to start Docker Application Co
 -- Unit docker.service has failed.
 --
 -- The result is failed.
+
+[Unit]
+Description=Docker Container
+Requires=docker.service
+After=docker.service network-online.target
+
+[Service]
+User=root
+Group=docker
+Restart=no
+ExecStart=/bin/docker run -ti --rm --network host -d -e LISTEN_DOMAIN=somedomain.dude.io -e CONSOLE_PUBLIC_KEY=ab+wejPfde8s0tqz1lINotReal= -e AUTOCOMMISSION_TOKEN=00101111111111111111111 -e NODE_ID_SEED=2 bob@sha256:333411111111111111111ff
+ExecStop=/bin/docker stop dockercontainer
+
+[Install]
+WantedBy=multi-user.target
