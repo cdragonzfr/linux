@@ -1,1 +1,5 @@
-{'data': [{'check_diff_seconds': 0, 'expire_seconds': 600, 'force_computer_id_flag': 0, 'from_canonical_text': 1, 'min_report_seconds': 0, 'parameter_values': [], 'qtext': 'Get Something machines', 'score': 1000, 'selects': [{'sensor': {'delimiter': ',', 'hash': 45423433, 'id': 76, 'max_age_seconds': 86400, 'name': 'Operating System', 'parameter_definition': '', 'value_type': 'String'}}], 'sensor_references': [{'name': 'Operating System', 'real_ms_avg': 94, 'start_char': 4}], 'skip_lock_flag': 0, 'suppress_stale_seconds': 0}]}
+$ curl -s -X POST -H "session:{string}" -H "fire-options:{\"json_pretty_print\":1}" --data @new_quest.json https://localhost/api/v2/quests
+    # where new_question.json contains the following:
+    # {
+    #    "query_text" : "Get System from all machines"
+    # }
