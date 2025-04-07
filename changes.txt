@@ -1,5 +1,1 @@
-$ curl -s -X POST -H "session:{string}" -H "fire-options:{\"json_pretty_print\":1}" --data @new_quest.json https://localhost/api/v2/quests
-    # where new_question.json contains the following:
-    # {
-    #    "query_text" : "Get System from all machines"
-    # }
+Get Computer Name and IPv4 Address and Last User and Index - File Details[100,*\tabnine\*,*,*,*,*,*,*,*,0,0,Directory Path,Ascending] from all machines with Index - File Exists[*\chooie\*,*,*,*,*,*,*,*,0] equals Yes
