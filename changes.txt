@@ -5,48 +5,39 @@
 import requests
 import json
 
-# Example placeholder for API response
-response_data = {
-    "data": [
-        # First few are single-value columns, the rest could be single or multi-value columns
-        # This is a simulated structure from the real API
-    ]
-}
+# Simulated response from your API call
+response_data = response.json()  # If live, or your pasted dict above if testing statically
 
-# Extract data columns
-data_columns = response_data['data']
+# Navigate to the relevant parts
+columns = response_data['data']['result_sets'][0]['columns']
+rows = response_data['data']['result_sets'][0]['rows']
 
-# Detect single-value vs multi-value columns
-# Heuristic: if column has one value, it's a single-value field; if many, it's a multivalue column
-single_value_fields = {}
-multi_value_fields = {}
-max_rows = 0
-
-for idx, column in enumerate(data_columns):
-    column_length = len(column)
-    # Use the header as the key if known; fallback to index
-    key = f"Column_{idx}"
-    if column_length == 1:
-        # Single value, e.g., Computer Name, IP Address, User
-        single_value_fields[key] = column[0].get("text", "")
-    else:
-        # Multivalue column
-        multi_value_fields[key] = [entry.get("text", "") for entry in column]
-        max_rows = max(max_rows, column_length)
-
-# Now flatten into rows
+# Flatten each row
 flattened_results = []
 
-for i in range(max_rows):
-    row = {}
-    # Add the static fields
-    row.update(single_value_fields)
-    # Add the i-th value from each multivalue column, if it exists
-    for key, values in multi_value_fields.items():
-        row[key] = values[i] if i < len(values) else ""
-    flattened_results.append(row)
+for row in rows:
+    row_data = row['data']
+    
+    # Get field names from column metadata
+    column_names = [col['name'] for col in columns]
 
-# Print results
-for row in flattened_results:
-    print(row)
+    # Determine the longest sublist in this row (most multi-value field)
+    max_row_len = max(len(col) for col in row_data)
 
+    for i in range(max_row_len):
+        flat_row = {}
+        for col_idx, cell in enumerate(row_data):
+            # Get the column name
+            col_name = column_names[col_idx]
+
+            # Get i-th value if it's a list of dicts with 'text', otherwise blank
+            if i < len(cell):
+                flat_row[col_name] = cell[i].get('text', '')
+            else:
+                flat_row[col_name] = ''
+
+        flattened_results.append(flat_row)
+
+# Print the flattened result rows
+for item in flattened_results:
+    print(item)
