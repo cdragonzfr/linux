@@ -91,3 +91,30 @@ for value_set in flattened_value_rows:
 {'', '4d616e69', '566ad1a80220026d05099562645ce968ff0e7c36cde22634332605bb34cc3eff', '>1 year ago', '92d04d6bd8a0235843240bba30d2f091', 'C:\\Users\\REDACT\\.IntelliJIdea2019.1\\config\\plugins\\TabNine\\lib\\TabNine-0.5.15.jar\\META-INF', '25', 'MANIFEST.MF', 'zip file', '79e33dd52ebdf615e6696ae69add91cb990d81e2'}
 {'', 'tabnine', '>1 year ago', 'C:\\Users\\REDACT\\.IntelliJIdea2019.1\\config\\plugins\\TabNine\\lib\\TabNine-0.5.15.jar\\com', '0', 'zip directory'}
 {'', 'C:\\Users\\REDACT\\.IntelliJIdea2019.1\\config\\plugins\\TabNine\\lib\\TabNine-0.5.15.jar\\com\\tabnine', '>1 year ago', 'intellij', '0', 'zip directory'}
+
+# Assume `response_data` is already defined
+columns = response_data['data']['result_sets'][0]['columns']
+rows = response_data['data']['result_sets'][0]['rows']
+
+flattened_value_rows = []
+
+for row in rows:
+    row_data = row['data']
+
+    # Determine the maximum number of values among all columns
+    max_row_len = max(len(col) for col in row_data)
+
+    # Normalize each column to have equal length by padding with empty dicts
+    normalized_cols = []
+    for col in row_data:
+        padded_col = col + [{'text': ''}] * (max_row_len - len(col))
+        normalized_cols.append([item.get('text', '') for item in padded_col])
+
+    # Transpose rows: build each row by taking i-th item from each column
+    for i in range(max_row_len):
+        value_row = [col[i] for col in normalized_cols]
+        flattened_value_rows.append(value_row)
+
+# Print in your requested style
+for value_row in flattened_value_rows:
+    print(f"{value_row}")
