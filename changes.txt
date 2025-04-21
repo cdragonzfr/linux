@@ -1,1 +1,76 @@
-[['REDACTEDHOST.redacted.red.re.com', '192.168.2.1', 'redacted\\redacted', 'C:\\Users\\redacted\\.IntelliJIdea2019.1\\config\\plugins\\TabNine\\lib', 'annotations-13.0.jar', 'file', '17536', '>1 year ago', '>1 year ago', '>1 year ago', '504b0304', 'f4fb462172517b46b6cd90003508515a', '919f0dfe192fb4e063e7dacadee7f8bb9a2672a9', 'ace2a10dc8e2d5fd34925ecac03e4988b2c0f851650c94b8cef49ba1bd111478', '', '1'], ['', '', '', 'C:\\Users\\redacted\\.IntelliJIdea2019.1\\config\\plugins\\TabNine\\lib', 'kotlin-stdlib-1.4.32.jar', 'file', '1495021', '>1 year ago', '>1 year ago', '>1 year ago', '504b0304', '3be731bc74b5d1737559299a94b9248f', '461367948840adbb0839c51d91ed74ef4a9ccb52', '13e9fd3e69dc7230ce0fc873a92a4e5d521d179bcf1bef75a6705baac3bfecba', '', ''], ['', '', '', 'C:\\Users\\redacted\\.IntelliJIdea2019.1\\config\\plugins\\TabNine\\lib', 'kotlin-stdlib-common-1.4.32.jar', 'file', '193119', '>1 year ago', '>1 year ago', '>1 year ago', '504b0304', 'dfb475546d8578a701090f3237230fd6', 'ef50bfa2c0491a11dcc35d9822edbfd6170e1ea2', 'e1ff6f55ee9e7591dcc633f7757bac25a7edb1cc7f738b37ec652f10f66a4145', '', ''], ['', '', '', 'C:\\Users\\redacted\\.IntelliJIdea2019.1\\config\\plugins\\TabNine\\lib', 'kotlin-stdlib-jdk7-1.4.32.jar', 'file', '22895', '>1 year ago', '>1 year ago', '>1 year ago', '504b0304', '859460a9d6807e2627f366b14326b8d6', '3546900a3ebff0c43f31190baf87a9220e37b7ea', '5f801e75ca27d8791c14b07943c608da27620d910a8093022af57f543d5d98b6', '', ''], ['', '', '', 'C:\\Users\\redacted\\.IntelliJIdea2019.1\\config\\plugins\\TabNine\\lib', 'kotlin-stdlib-jdk8-1.4.32.jar', 'file', '16221', '>1 year ago', '>1 year ago', '>1 year ago', '504b0304', '70bd512a952df15e42b31a5c82e55d88', '3302f9ec8a5c1ed220781dbd37770072549bd333', 'adc43e54757b106e0cd7b3b7aa257dff471b61efdabe067fc02b2f57e2396262', '', ''], ['', '', '', 'C:\\Users\\redacted\\.IntelliJIdea2019.1\\config\\plugins\\TabNine\\lib', 'searchableOptions-0.5.15.jar', 'file', '1119', '>1 year ago', '>1 year ago', '>1 year ago', '504b0304', '9e1c9d7716e9c324a3c54488115c6b74', '7ea2dff817979ba6aba95a7d82c5c8c93bcb3c58', '39a10684eef7bb3552826af02f229cd9d409b3f3e96635b1bb207ed105eb4b0a', '', ''], ['', '', '', 'C:\\Users\\redacted\\.IntelliJIdea2019.1\\config\\plugins\\TabNine\\lib', 'TabNine-0.5.15.jar', 'file', '282505', '>1 year ago', '>1 year ago', '>1 year ago', '504b0304', '5adc06dd757cb960f771c177eec88ada', 'd41bed549a07fc08f5a3c0cc090f66c3d1d1f007', '5d75a169922e7bed50e79393e0f788d31b99d1f76fed79434e97e43069511d75', '', '']]
+import requests
+import csv
+
+# ====== CONFIGURATION ======
+GITHUB_TOKEN = "ghp_YourPersonalAccessTokenHere"  # Replace with your token
+ORG_NAME = "your-org-name"  # Replace with your org name
+GITHUB_API_URL = "https://github.yourcompany.com/api/v3"  # Or "https://api.github.com"
+CSV_OUTPUT_FILE = f"{ORG_NAME}_public_repos.csv"
+
+# ====== HEADERS ======
+headers = {
+    "Authorization": f"token {GITHUB_TOKEN}",
+    "Accept": "application/vnd.github+json"
+}
+
+# ====== FUNCTION TO LIST PUBLIC REPOS ======
+def list_public_repos(org_name):
+    public_repos = []
+    page = 1
+    per_page = 100
+
+    while True:
+        url = f"{GITHUB_API_URL}/orgs/{org_name}/repos?type=public&per_page={per_page}&page={page}"
+        response = requests.get(url, headers=headers)
+
+        if response.status_code != 200:
+            print(f"Failed to retrieve repos: {response.status_code} - {response.text}")
+            break
+
+        data = response.json()
+        if not data:
+            break
+
+        for repo in data:
+            public_repos.append({
+                "organization": org_name,
+                "repository_name": repo["name"],
+                "url": repo["html_url"],
+                "description": repo["description"] or "",
+                # Optional extras:
+                "created_at": repo["created_at"],
+                "updated_at": repo["updated_at"],
+                "language": repo["language"] or ""
+            })
+
+        page += 1
+
+    return public_repos
+
+# ====== WRITE TO CSV ======
+def write_repos_to_csv(repos, filename):
+    fieldnames = [
+        "organization",
+        "repository_name",
+        "url",
+        "description",
+        "created_at",       # optional
+        "updated_at",       # optional
+        "language"          # optional
+    ]
+    
+    with open(filename, mode='w', newline='', encoding='utf-8') as csvfile:
+        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+        writer.writeheader()
+        for repo in repos:
+            writer.writerow(repo)
+
+# ====== MAIN ======
+if __name__ == "__main__":
+    repos = list_public_repos(ORG_NAME)
+    if repos:
+        print(f"Found {len(repos)} public repositories in '{ORG_NAME}'. Writing to {CSV_OUTPUT_FILE}...")
+        write_repos_to_csv(repos, CSV_OUTPUT_FILE)
+        print("Done.")
+    else:
+        print("No public repositories found or access denied.")
